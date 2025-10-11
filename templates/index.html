@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Sign Language Translator</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #2c2f33;
+    color: #fff;
+    margin: 0;
+    padding: 20px;
+}
+
+#video-grid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    width: 90%;
+    max-width: 640px;
+}
+
+.video-container {
+    position: relative;
+    width: 100%;
+    text-align: center;
+}
+
+.video-container h2 { margin-bottom: 10px; }
+
+video, img {
+    width: 100%;
+    border-radius: 10px;
+    background: #000;
+    display: block;
+}
+
+.video-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #2c2f33;
+    border-radius: 10px;
+    pointer-events: none;
+}
+
+#processedVideo {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 10px;
+    object-fit: cover;
+}
+
+#text-output {
+    margin-top: 20px;
+    width: 100%;
+    max-width: 640px;
+    background: #1e1f22;
+    color: #fff;
+    padding: 10px;
+    border-radius: 10px;
+    font-size: 1.5rem;
+    min-height: 50px;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    position: relative;
+    font-family: 'Courier New', monospace;
+}
+
+/* Blinking cursor */
+#text-output::after {
+    content: '|';
+    display: inline-block;
+    margin-left: 2px;
+    animation: blink 1s steps(2, start) infinite;
+}
+
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+}
+</style>
+</head>
+<body>
+<h1>AI Sign Language Translator</h1>
+<div id="video-grid">
+    <div class="video-container">
+        <h2>AI Processed Video</h2>
+        <video id="localVideo" autoplay muted playsinline style="transform: scaleX(-1);"></video>
+        <div class="video-overlay"></div>
+        <img id="processedVideo" src="">
+    </div>
+    <div id="text-output"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+<script>
+const socket = io();
+const localVideo = document.getElementById('localVideo');
+const processedVideo = document.getElementById('processedVideo');
+const textOutput = document.getElementById('text-output');
+const FPS = 20;
+
+const canvas = document.createElement('canvas');
+const context = canvas.getContext('2d');
+
+navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
+    .then(stream => { localVideo.srcObject = stream; })
+    .catch(error => console.error(error));
+
+setInterval(() => {
+    if (localVideo.readyState === localVideo.HAVE_ENOUGH_DATA) {
+        canvas.width = localVideo.videoWidth;
+        canvas.height = localVideo.videoHeight;
+        context.drawImage(localVideo, 0, 0, canvas.width, canvas.height);
+        const data = canvas.toDataURL('image/jpeg');
+        socket.emit('video_frame', { image: data });
+    }
+}, 1000 / FPS);
+
+socket.on('processed_frame', function(data) {
+    processedVideo.src = data.image;
+    textOutput.textContent = data.sentence || "";
+});
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === ' ' || event.key === 'Backspace') {
+        event.preventDefault();
+        socket.emit('key_event', { data: event.key });
+    }
+});
+</script>
+</body>
+</html>
